@@ -1,0 +1,87 @@
+python-telegram-bot==20.8
+moviepy
+requests
+gtts
+Pillowimport os
+import uuid
+import shutil
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+async def start(update: Update, context):
+    await update.message.reply_text(
+        "سلام داداش! بات ریک و مورتی فارسی آماده‌ست\n"
+        "یه موضوع بفرست، برات ویدیوی ۴-۶ دقیقه‌ای می‌سازم\n\n"
+        "مثال: ریک و مورتی میان عید نوروز تهران"
+    )
+
+async def handle(update: Update, context):
+    topic = update.message.text
+    msg = await update.message.reply_text("در حال ساخت ویدیو… حدود ۸-۱۰ دقیقه")
+
+    job_id = str(uuid.uuid4())[:8]
+    folder = f"temp/{job_id}"
+    os.makedirs(folder, exist_ok=True)
+
+    try:
+        os.system(f"python make_video.py \"{topic}\" {folder}")
+        video_path = f"{folder}/final.mp4"
+        if os.path.exists(video_path):
+            with open(video_path, "rb") as f:
+                await update.message.reply_video(f, caption=f"موضوع: {topic}")
+            await msg.delete()
+        else:
+            await msg.edit_text("مشکلی پیش اومد، دوباره امتحان کن")
+    except:
+        await msg.edit_text("خطا داد، دوباره بفرست")
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+app = Application.builder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+app.run_polling()import os, sys, os, requests, random
+from moviepy.editor import *
+from gtts import gTTS
+
+topic = sys.argv[1]
+folder = sys.argv[2]
+
+script = [
+    f"ریک: بورپ! مورتی بیا بریم {topic}",
+    "مورتی: ریییک نه! باز کجا؟",
+    "ریک: ساکت باش، فقط بیا… بورپ!",
+    f"مورتی: وااا این کجاست؟ همه دارن با سبزه و ماهی قرمز دور همن!",
+    "ریک: ظاهراً رسیدیم ایران وسط عید نوروز… بورپ جالب شد",
+    "مورتی: ولی ریک… ما که هدیه نیاوردیم!",
+    "ریک: نگران نباش، من یه دستگاه هفت‌سین‌ساز اختراع کردم… نگاه کن!"
+]
+
+clips = []
+for i, line in enumerate(script):
+    speaker = "rick" if "ریک" in line else "morty"
+    text = line.split(":", 1)[1] if ":" in line else line
+
+    # صدا
+    tts = gTTS(text, lang='fa')
+    audio = f"{folder}/a{i}.mp3"
+    tts.save(audio)
+
+    # عکس
+    url = f"https://image.pollinations.ai/prompt/{text} rick and morty style cartoon vibrant colors?width=1280&height=720&nologo"
+    img = f"{folder}/i{i}.jpg"
+    open(img, "wb").write(requests.get(url).content)
+
+    duration = AudioFileClip(audio).duration + 1.5
+    clip = ImageClip(img).set_duration(duration).resize(lambda t: 1+0.04*t)
+    txt = TextClip(text, fontsize=50, color="lime" if speaker=="rick" else "yellow", font="Arial-Bold", stroke_color="black", stroke_width=3)\
+          .set_pos(('center','bottom')).set_duration(duration)
+    final_clip = CompositeVideoClip([clip, txt]).set_audio(AudioFileClip(audio))
+    clips.append(final_clip)
+
+video = concatenate_videoclips(clips)
+video.write_videofile(f"{folder}/final.mp4", fps=24, threads=4, preset="ultrafast"){
+  "start": "python bot.py"
+}
